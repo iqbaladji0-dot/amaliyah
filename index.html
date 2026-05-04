@@ -95,14 +95,23 @@ const COLORS = ["#c9a96e","#6ec9a9","#6ea9c9","#c96e9a","#9a6ec9","#c9916e","#6e
 
 // ============ STATE ============
 let isAdmin = false;
-let members = [
+let members = [];
+let amalanList = [];
+let records = {};
+let activeTab = "rekap";
+let selectedMember = null;
+let today = new Date().toISOString().slice(0,10);
+let configLoaded = false;
+
+// Default config (used only if Sheet has no config yet)
+const DEFAULT_MEMBERS = [
   {name:"Akhi Fulan", pin:"000000"},
   {name:"Akhi 2", pin:"000000"},
   {name:"Akhi 3", pin:"000000"},
   {name:"Akhi 4", pin:"000000"},
   {name:"Akhi 5", pin:"000000"}
 ];
-let amalanList = [
+const DEFAULT_AMALAN = [
   {id:"subuh",name:"Shalat Subuh",type:"check",icon:"🌅"},
   {id:"dhuha",name:"Shalat Dhuha",type:"check",icon:"☀️"},
   {id:"dzuhur",name:"Shalat Dzuhur",type:"check",icon:"🕐"},
@@ -116,10 +125,77 @@ let amalanList = [
   {id:"sedekah",name:"Sedekah",type:"check",icon:"💝"},
   {id:"puasa",name:"Puasa Sunnah",type:"check",icon:"🕌"}
 ];
-let records = {};
-let activeTab = "rekap";
-let selectedMember = null;
-let today = new Date().toISOString().slice(0,10);
+
+// ============ LOAD CONFIG FROM SHEET ============
+async function loadConfig() {
+  try {
+    const resp = await fetch(SCRIPT_URL + "?action=getConfig&t=" + Date.now());
+    const data = await resp.json();
+    if (data && data.members && data.members.length > 0) {
+      members = data.members;
+      amalanList = data.amalan;
+      configLoaded = true;
+      return true;
+    }
+  } catch(e) {
+    console.log("Config load error:", e);
+  }
+  // Fallback to defaults
+  members = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+  amalanList = JSON.parse(JSON.stringify(DEFAULT_AMALAN));
+  configLoaded = true;
+  return false;
+}
+
+// ============ SAVE CONFIG TO SHEET (ADMIN) ============
+async function saveConfig() {
+  const btn = document.getElementById('saveConfigBtn');
+  const status = document.getElementById('syncStatus');
+  if (btn) { btn.textContent = "⏳ Menyimpan..."; btn.disabled = true; }
+  status.classList.remove('hidden');
+  status.style.background = "rgba(110,201,169,0.1)";
+  status.style.color = "var(--green)";
+  status.textContent = "Menyimpan pengaturan...";
+
+  try {
+    const payload = JSON.stringify({
+      action: "saveConfig",
+      members: members,
+      amalan: amalanList
+    });
+
+    let iframe = document.getElementById('syncFrame');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'syncFrame';
+      iframe.name = 'syncFrame';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = SCRIPT_URL;
+    form.target = 'syncFrame';
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = payload;
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+
+    await new Promise(r => setTimeout(r, 3000));
+    status.textContent = "✅ Pengaturan tersimpan! Semua HP akan dapat data yang sama.";
+  } catch(err) {
+    status.style.background = "rgba(220,80,80,0.1)";
+    status.style.color = "var(--red)";
+    status.textContent = "❌ Gagal: " + err.message;
+  }
+  if (btn) { btn.textContent = "💾 Save Pengaturan"; btn.disabled = false; }
+  setTimeout(() => status.classList.add('hidden'), 4000);
+}
 
 // ============ HELPERS ============
 function getRecord(memberName, amalanId) { return records[`${memberName}_${today}_${amalanId}`]; }
@@ -209,13 +285,24 @@ function doLogout() {
   document.getElementById('loginPass').value='';
 }
 
-function showApp() {
+async function showApp() {
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('mainApp').classList.remove('hidden');
   document.getElementById('dateDisplay').textContent = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   if (isAdmin) document.getElementById('adminBadge').classList.remove('hidden');
   else document.getElementById('adminBadge').classList.add('hidden');
+
+  // Show loading while fetching config
+  document.getElementById('content').innerHTML = `
+    <div style="text-align:center;padding:60px 20px">
+      <div style="font-size:32px;margin-bottom:16px">☪</div>
+      <p style="color:var(--accent);font-size:14px">Memuat data kelompok...</p>
+    </div>`;
   renderTabs();
+
+  // Load config from Google Sheets
+  await loadConfig();
+
   render();
   // Show install popup after login with short delay
   setTimeout(() => {
@@ -547,6 +634,16 @@ function renderKelola() {
     </div>`;
   });
   html += `</div>`;
+
+  // Save Pengaturan button
+  html += `<div style="margin-top:24px">
+    <button id="saveConfigBtn" class="btn-gold" onclick="saveConfig()" style="width:100%;padding:16px;font-size:15px;border-radius:14px">
+      💾 Save Pengaturan
+    </button>
+    <p style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:8px">
+      ⚠️ Setelah ubah nama/PIN/amalan, <strong style="color:var(--accent)">wajib klik Save Pengaturan</strong> supaya semua HP dapat data yang sama.
+    </p>
+  </div>`;
 
   return html;
 }
