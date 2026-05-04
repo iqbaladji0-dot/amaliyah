@@ -217,6 +217,11 @@ function showApp() {
   else document.getElementById('adminBadge').classList.add('hidden');
   renderTabs();
   render();
+  // Show install popup after login with short delay
+  setTimeout(() => {
+    if (deferredPrompt) showInstallPopup();
+    else if (/iPhone|iPad/.test(navigator.userAgent) && !window.matchMedia('(display-mode: standalone)').matches) showIOSInstallPopup();
+  }, 1500);
 }
 
 // ============ SAVE to Google Sheets ============
@@ -598,7 +603,7 @@ let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  showInstallPopup();
+  // Don't show yet - wait until after login
 });
 
 function showInstallPopup() {
@@ -654,34 +659,32 @@ function dismissInstall() {
   sessionStorage.setItem('installDismissed', 'true');
 }
 
-// Show manual install hint for iOS (Safari)
-if (/iPhone|iPad/.test(navigator.userAgent) && !window.matchMedia('(display-mode: standalone)').matches) {
-  setTimeout(() => {
-    if (sessionStorage.getItem('installDismissed')) return;
-    const popup = document.createElement('div');
-    popup.id = 'installPopup';
-    popup.innerHTML = `
-      <div style="position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;animation:slideUp 0.4s ease-out">
-        <div style="max-width:420px;margin:0 auto;background:rgba(19,39,68,0.98);backdrop-filter:blur(20px);border:1px solid rgba(201,169,110,0.25);border-radius:20px;padding:24px;box-shadow:0 -8px 40px rgba(0,0,0,0.5)">
-          <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
-            <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#c9a96e,#e8d5b7);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">☪</div>
-            <div>
-              <h3 style="font-size:16px;font-weight:600;color:#e8d5b7;margin:0 0 4px">Install Amaliyah di HP?</h3>
-              <p style="font-size:13px;color:rgba(255,255,255,0.6);margin:0;line-height:1.5">Ketuk tombol <strong style="color:#fff">Share (↑)</strong> di Safari, lalu pilih <strong style="color:#fff">"Add to Home Screen"</strong>.</p>
-            </div>
+// iOS install hint (called from showApp)
+function showIOSInstallPopup() {
+  if (sessionStorage.getItem('installDismissed')) return;
+  const popup = document.createElement('div');
+  popup.id = 'installPopup';
+  popup.innerHTML = `
+    <div style="position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;animation:slideUp 0.4s ease-out">
+      <div style="max-width:420px;margin:0 auto;background:rgba(19,39,68,0.98);backdrop-filter:blur(20px);border:1px solid rgba(201,169,110,0.25);border-radius:20px;padding:24px;box-shadow:0 -8px 40px rgba(0,0,0,0.5)">
+        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
+          <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#c9a96e,#e8d5b7);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">☪</div>
+          <div>
+            <h3 style="font-size:16px;font-weight:600;color:#e8d5b7;margin:0 0 4px">Install Amaliyah di HP?</h3>
+            <p style="font-size:13px;color:rgba(255,255,255,0.6);margin:0;line-height:1.5">Ketuk tombol <strong style="color:#fff">Share (↑)</strong> di Safari, lalu pilih <strong style="color:#fff">"Add to Home Screen"</strong>.</p>
           </div>
-          <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06)">
-            <p style="font-size:12px;color:var(--accent);font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:1px">🔒 Tentang Keamanan</p>
-            <p style="font-size:12px;color:rgba(255,255,255,0.5);margin:0;line-height:1.7">
-              Insya Allah aman — ini aplikasi web (PWA), bukan dari App Store. Tidak ada data pribadi yang dikumpulkan.
-            </p>
-          </div>
-          <button onclick="dismissInstall()" style="width:100%;padding:13px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:12px;color:var(--text-secondary);font-size:14px;cursor:pointer;font-family:'Outfit',sans-serif">Oke, Paham</button>
         </div>
+        <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06)">
+          <p style="font-size:12px;color:var(--accent);font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:1px">🔒 Tentang Keamanan</p>
+          <p style="font-size:12px;color:rgba(255,255,255,0.5);margin:0;line-height:1.7">
+            Insya Allah aman — ini aplikasi web (PWA), bukan dari App Store. Tidak ada data pribadi yang dikumpulkan.
+          </p>
+        </div>
+        <button onclick="dismissInstall()" style="width:100%;padding:13px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:12px;color:var(--text-secondary);font-size:14px;cursor:pointer;font-family:'Outfit',sans-serif">Oke, Paham</button>
       </div>
-    `;
-    document.body.appendChild(popup);
-  }, 2000);
+    </div>
+  `;
+  document.body.appendChild(popup);
 }
 
 // Register service worker
