@@ -455,11 +455,24 @@ function renderRekap() {
   const gs = getGroupStats();
   const dateStr = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   
+  // Count members who have filled at least 1 amalan
+  let membersFilled = 0;
+  members.forEach(m => {
+    let hasData = false;
+    amalanList.forEach(a => {
+      const v = getRecord(m.name, a.id);
+      if (a.type==="check" && v) hasData = true;
+      if (a.type==="number" && v > 0) hasData = true;
+    });
+    if (hasData) membersFilled++;
+  });
+  const memberPct = members.length > 0 ? (membersFilled / members.length) * 100 : 0;
+
   let html = `<div class="card" style="text-align:center;padding:28px">
     <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Rekap Amalan</p>
     <p style="font-size:14px;color:var(--accent);margin-bottom:16px;font-weight:500">📅 ${dateStr}</p>
-    ${donut(gs.pct,140,12)}
-    <p style="margin-top:12px;font-size:14px;color:var(--text-secondary)">${gs.done} dari ${gs.total} amalan terisi</p>
+    ${donut(memberPct,140,12)}
+    <p style="margin-top:12px;font-size:14px;color:var(--text-secondary)">${membersFilled} dari ${members.length} anggota sudah isi</p>
   </div>`;
 
   // Per amalan
@@ -691,6 +704,37 @@ function addMember() {
 
 // ============ INIT ============
 document.getElementById('dateDisplay').textContent = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+
+// ============ BACK BUTTON HANDLING ============
+// Push initial state
+history.pushState({page:'login'}, '');
+
+function pushState(state) {
+  history.pushState(state, '');
+}
+
+window.addEventListener('popstate', function(e) {
+  // Always push a new state so we never actually leave
+  history.pushState({}, '');
+
+  // If not logged in, do nothing
+  if (document.getElementById('loginScreen').classList.contains('hidden') === false) return;
+
+  // Handle back navigation within the app
+  if (pinAttemptMember) {
+    // In PIN prompt → go back to member select
+    cancelPin();
+  } else if (selectedMember) {
+    // In member detail/input form → go back to member select
+    selectedMember = null;
+    render();
+  } else if (activeTab !== "rekap") {
+    // In Input/Kelola tab → go back to Rekap
+    activeTab = "rekap";
+    render();
+  }
+  // If already on Rekap, do nothing (don't leave the app)
+});
 
 // ============ PWA INSTALL ============
 let deferredPrompt = null;
