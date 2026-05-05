@@ -608,20 +608,22 @@ function renderKelola() {
   // Kelola Amalan
   html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin:0">📋 Daftar Amalan (${amalanList.length})</p>
-    <button class="btn-accent" onclick="document.getElementById('addAmalanForm').classList.toggle('hidden')">+ Tambah</button>
+    <button class="btn-accent" onclick="showAddAmalan=!showAddAmalan;render()">+ Tambah</button>
   </div>`;
 
-  html += `<div id="addAmalanForm" class="hidden card" style="border-color:rgba(201,169,110,0.2)">
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <input id="newAmalanName" class="input-field" placeholder="Nama amalan (misal: Shalat Witir)">
-      <div style="display:flex;gap:8px">
-        <button id="typeCheck" onclick="setAmalanType('check')" class="btn-accent" style="flex:1;border-color:var(--accent)">✓ Centang (Ya/Tidak)</button>
-        <button id="typeNumber" onclick="setAmalanType('number')" class="btn-accent" style="flex:1;opacity:0.5">🔢 Angka (Jumlah)</button>
+  if (showAddAmalan) {
+    html += `<div class="card" style="border-color:rgba(201,169,110,0.2)">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <input id="newAmalanName" class="input-field" placeholder="Nama amalan (misal: Shalat Witir)">
+        <div style="display:flex;gap:8px">
+          <button onclick="newAmalanType='check';render()" class="btn-accent" style="flex:1;border-color:${newAmalanType==='check'?'var(--accent)':'rgba(201,169,110,0.3)'};opacity:${newAmalanType==='check'?'1':'0.5'}">✓ Centang (Ya/Tidak)</button>
+          <button onclick="newAmalanType='number';render()" class="btn-accent" style="flex:1;border-color:${newAmalanType==='number'?'var(--accent)':'rgba(201,169,110,0.3)'};opacity:${newAmalanType==='number'?'1':'0.5'}">🔢 Angka (Jumlah)</button>
+        </div>
+        ${newAmalanType==='number' ? '<input id="newAmalanUnit" class="input-field" placeholder="Satuan (misal: lembar, kali, rakaat)">' : ''}
+        <button class="btn-gold" onclick="addAmalan()">Tambah Amalan</button>
       </div>
-      <input id="newAmalanUnit" class="input-field hidden" placeholder="Satuan (misal: lembar, kali, rakaat)">
-      <button class="btn-gold" onclick="addAmalan()">Tambah Amalan</button>
-    </div>
-  </div>`;
+    </div>`;
+  }
 
   html += `<div class="card" style="padding:16px">`;
   amalanList.forEach((a,i) => {
@@ -650,21 +652,17 @@ function renderKelola() {
 
 // ============ ACTIONS ============
 let newAmalanType = "check";
-function setAmalanType(t) {
-  newAmalanType = t;
-  document.getElementById('typeCheck').style.opacity = t==="check"?"1":"0.5";
-  document.getElementById('typeCheck').style.borderColor = t==="check"?"var(--accent)":"rgba(201,169,110,0.3)";
-  document.getElementById('typeNumber').style.opacity = t==="number"?"1":"0.5";
-  document.getElementById('typeNumber').style.borderColor = t==="number"?"var(--accent)":"rgba(201,169,110,0.3)";
-  if (t==="number") document.getElementById('newAmalanUnit').classList.remove('hidden');
-  else document.getElementById('newAmalanUnit').classList.add('hidden');
-}
+let showAddAmalan = false;
 
 function addAmalan() {
-  const name = document.getElementById('newAmalanName').value.trim();
+  const nameEl = document.getElementById('newAmalanName');
+  const name = nameEl ? nameEl.value.trim() : '';
   if (!name) return;
-  const unit = newAmalanType==="number" ? (document.getElementById('newAmalanUnit').value.trim()||"kali") : "";
+  const unitEl = document.getElementById('newAmalanUnit');
+  const unit = newAmalanType==="number" ? ((unitEl ? unitEl.value.trim() : '') || "kali") : "";
   amalanList.push({id:name.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now(), name, type:newAmalanType, unit, icon:newAmalanType==="check"?"✅":"🔢"});
+  showAddAmalan = false;
+  newAmalanType = "check";
   render();
 }
 
