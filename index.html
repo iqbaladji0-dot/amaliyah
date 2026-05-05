@@ -75,6 +75,7 @@ input:focus { outline:none; border-color:rgba(232,213,183,0.4) !important; }
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn-accent" onclick="syncToSheet()" id="syncBtn">💾 Save</button>
+      <button onclick="testPost()" style="padding:8px 12px;background:rgba(110,201,169,0.1);border:1px solid rgba(110,201,169,0.3);border-radius:10px;color:var(--green);font-size:11px;cursor:pointer">🧪</button>
       <button onclick="doLogout()" style="padding:8px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;color:var(--text-secondary);font-size:13px;cursor:pointer">Keluar</button>
     </div>
   </div>
@@ -89,7 +90,7 @@ input:focus { outline:none; border-color:rgba(232,213,183,0.4) !important; }
 
 <script>
 // ============ CONFIG ============
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdpFV2sOkIyqE-wigSn2Wlr80wGO8EH5-W1vovTJM_oEqUtOA0FbGhgbhw5FkCM62v/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3yavNxGsgBhhnhcEbxYRRNGgwXn3zUb1uCzbDfHfnGOfklEWo9x-DDilJCRyDDQd0/exec";
 
 const COLORS = ["#c9a96e","#6ec9a9","#6ea9c9","#c96e9a","#9a6ec9","#c9916e","#6ec96e","#c9c96e","#6e8fc9","#c96e6e"];
 
@@ -158,36 +159,20 @@ async function saveConfig() {
   status.textContent = "Menyimpan pengaturan...";
 
   try {
-    const payload = JSON.stringify({
-      action: "saveConfig",
+    const payload = encodeURIComponent(JSON.stringify({
       members: members,
       amalan: amalanList
-    });
-
-    let iframe = document.getElementById('syncFrame');
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id = 'syncFrame';
-      iframe.name = 'syncFrame';
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
+    }));
+    const url = SCRIPT_URL + "?action=saveConfig&payload=" + payload + "&t=" + Date.now();
+    
+    const resp = await fetch(url);
+    const result = await resp.text();
+    
+    if (result.includes("saved") || result.includes("OK")) {
+      status.textContent = "✅ Pengaturan tersimpan! Semua HP akan dapat data yang sama.";
+    } else {
+      status.textContent = "⚠️ Response: " + result.substring(0, 100);
     }
-
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = SCRIPT_URL;
-    form.target = 'syncFrame';
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.value = payload;
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-
-    await new Promise(r => setTimeout(r, 3000));
-    status.textContent = "✅ Pengaturan tersimpan! Semua HP akan dapat data yang sama.";
   } catch(err) {
     status.style.background = "rgba(220,80,80,0.1)";
     status.style.color = "var(--red)";
@@ -311,7 +296,7 @@ async function showApp() {
   }, 1500);
 }
 
-// ============ SAVE to Google Sheets ============
+// ============ SAVE to Google Sheets (via GET - proven working) ============
 async function syncToSheet() {
   const btn = document.getElementById('syncBtn');
   const status = document.getElementById('syncStatus');
@@ -326,7 +311,6 @@ async function syncToSheet() {
     const hdrs = ["tanggal","nama", ...amalanList.map(a=>a.name)];
     const rows = [];
     members.forEach(member => {
-      // Check if this member has ANY data filled in
       let hasData = false;
       amalanList.forEach(a => {
         const v = getRecord(member.name, a.id);
@@ -334,7 +318,6 @@ async function syncToSheet() {
         if (a.type === "number" && v > 0) hasData = true;
       });
 
-      // Only include members who actually filled something
       if (hasData) {
         const row = {tanggal: today, nama: member.name};
         amalanList.forEach(a => {
@@ -356,41 +339,20 @@ async function syncToSheet() {
       return;
     }
 
-    const payload = JSON.stringify({headers: hdrs, data: rows});
-
-    // Show what's being sent
+    // Send via GET using fetch (doGet proven working)
+    const payload = encodeURIComponent(JSON.stringify({headers: hdrs, data: rows}));
+    const url = SCRIPT_URL + "?action=saveData&payload=" + payload + "&t=" + Date.now();
+    
     status.textContent = "📤 Mengirim " + rows.length + " data...";
-    console.log("Sending to:", SCRIPT_URL);
-    console.log("Rows:", rows.length, rows);
-
-    // Method: hidden form POST to iframe (bypasses CORS)
-    let iframe = document.getElementById('syncFrame');
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id = 'syncFrame';
-      iframe.name = 'syncFrame';
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
+    
+    const resp = await fetch(url);
+    const result = await resp.text();
+    
+    if (result.includes("OK")) {
+      status.textContent = "✅ Tersimpan! (" + rows.length + " anggota)";
+    } else {
+      status.textContent = "⚠️ Response: " + result.substring(0, 100);
     }
-
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = SCRIPT_URL;
-    form.target = 'syncFrame';
-    
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.value = payload;
-    form.appendChild(input);
-    
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-
-    await new Promise(r => setTimeout(r, 3000));
-
-    status.textContent = "✅ Tersimpan! (" + rows.length + " anggota)";
   } catch(err) {
     status.style.background = "rgba(220,80,80,0.1)";
     status.style.color = "var(--red)";
