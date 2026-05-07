@@ -74,8 +74,9 @@ input:focus { outline:none; border-color:rgba(232,213,183,0.4) !important; }
       <span id="adminBadge" class="hidden" style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:6px;background:rgba(201,169,110,0.15);color:var(--accent);font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase">ADMIN</span>
     </div>
     <div style="display:flex;gap:8px">
+      <button class="btn-accent" onclick="refreshData()" title="Refresh">🔄</button>
+      <button class="btn-accent" onclick="refreshFromSheet()" id="refreshBtn" title="Refresh data dari server">🔄</button>
       <button class="btn-accent" onclick="syncToSheet()" id="syncBtn">💾 Save</button>
-      <button onclick="testPost()" style="padding:8px 12px;background:rgba(110,201,169,0.1);border:1px solid rgba(110,201,169,0.3);border-radius:10px;color:var(--green);font-size:11px;cursor:pointer">🧪</button>
       <button onclick="doLogout()" style="padding:8px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;color:var(--text-secondary);font-size:13px;cursor:pointer">Keluar</button>
     </div>
   </div>
@@ -90,7 +91,7 @@ input:focus { outline:none; border-color:rgba(232,213,183,0.4) !important; }
 
 <script>
 // ============ CONFIG ============
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3yavNxGsgBhhnhcEbxYRRNGgwXn3zUb1uCzbDfHfnGOfklEWo9x-DDilJCRyDDQd0/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbLGBOCMLSHoI42dr3tnnprJN2SLXo5ghWceYV9tAni3IQH8lA8ESWcCphX8leoPa8/exec";
 
 const COLORS = ["#c9a96e","#6ec9a9","#6ea9c9","#c96e9a","#9a6ec9","#c9916e","#6ec96e","#c9c96e","#6e8fc9","#c96e6e"];
 
@@ -182,9 +183,63 @@ async function saveConfig() {
   setTimeout(() => status.classList.add('hidden'), 4000);
 }
 
+// ============ LOAD AMALAN DATA FROM SHEET ============
+async function loadAmalanData() {
+  try {
+    const url = SCRIPT_URL + "?action=getData&date=" + encodeURIComponent(today) + "&t=" + Date.now();
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data && Array.isArray(data) && data.length > 0) {
+      data.forEach(row => {
+        if (row.nama && row.amalanId) {
+          let val = row.value;
+          if (row.type === "check") {
+            val = (val === true || val === "true" || val === "Ya" || val === "1");
+          } else {
+            val = parseInt(val) || 0;
+          }
+          records[`${row.nama}_${today}_${row.amalanId}`] = val;
+        }
+      });
+      return true;
+    }
+  } catch(e) {
+    console.log("Load amalan data error:", e);
+  }
+  return false;
+}
+
+// ============ AUTO-SAVE SINGLE AMALAN TO SHEET ============
+function saveSingleAmalan(memberName, amalanId, value, type) {
+  try {
+    const amalan = amalanList.find(a => a.id === amalanId);
+    const amalanName = amalan ? amalan.name : amalanId;
+    const saveVal = type === "check" ? (value ? "Ya" : "Tidak") : value;
+    const payload = encodeURIComponent(JSON.stringify({
+      action: "saveAmalan",
+      tanggal: today,
+      nama: memberName,
+      amalanId: amalanId,
+      amalanName: amalanName,
+      value: saveVal,
+      type: type
+    }));
+    const url = SCRIPT_URL + "?action=saveAmalan&payload=" + payload + "&t=" + Date.now();
+    fetch(url).catch(e => console.log("Auto-save error:", e));
+  } catch(e) {
+    console.log("Auto-save error:", e);
+  }
+}
+
 // ============ HELPERS ============
 function getRecord(memberName, amalanId) { return records[`${memberName}_${today}_${amalanId}`]; }
-function setRecordVal(memberName, amalanId, val) { records[`${memberName}_${today}_${amalanId}`] = val; render(); }
+function setRecordVal(memberName, amalanId, val) {
+  records[`${memberName}_${today}_${amalanId}`] = val;
+  // Auto-save ke Google Sheets
+  const amalan = amalanList.find(a => a.id === amalanId);
+  if (amalan) saveSingleAmalan(memberName, amalanId, val, amalan.type);
+  render();
+}
 
 function getMemberStats(memberName) {
   let done=0;
@@ -287,6 +342,8 @@ async function showApp() {
 
   // Load config from Google Sheets
   await loadConfig();
+  // Load data amalan hari ini dari Sheet
+  await loadAmalanData();
 
   render();
   // Show install popup after login with short delay
@@ -391,6 +448,39 @@ function testPost() {
   form.submit();
   document.body.removeChild(form);
 }
+
+// ============ REFRESH FROM SHEET ============
+async function refreshFromSheet() {
+  const btn = document.getElementById('refreshBtn');
+  const status = document.getElementById('syncStatus');
+  btn.textContent = "⏳";
+  btn.disabled = true;
+  status.classList.remove('hidden');
+  status.style.background = "rgba(110,201,169,0.1)";
+  status.style.color = "var(--green)";
+  status.textContent = "🔄 Memuat data terbaru...";
+  await loadConfig();
+  await loadAmalanData();
+  render();
+  status.textContent = "✅ Data diperbarui!";
+  btn.textContent = "🔄";
+  btn.disabled = false;
+  setTimeout(() => status.classList.add('hidden'), 3000);
+}
+
+// ============ AUTO-REFRESH TIAP 2 MENIT ============
+setInterval(async () => {
+  if (!document.getElementById('mainApp').classList.contains('hidden')) {
+    const newToday = new Date().toISOString().slice(0,10);
+    if (newToday !== today) {
+      today = newToday;
+      records = {};
+      document.getElementById('dateDisplay').textContent = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+    }
+    await loadAmalanData();
+    render();
+  }
+}, 120000);
 
 // ============ TABS ============
 function renderTabs() {
