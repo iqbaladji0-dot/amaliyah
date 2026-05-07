@@ -443,6 +443,182 @@ async function refreshFromSheet() {
 }
 
 // ============ AUTO-REFRESH TIAP 2 MENIT ============
+
+// ============ RIWAYAT 7 HARI ============
+let historyData = {}; // { "2026-05-07": [{nama, amalanId, amalanName, value, type},...] }
+let historyLoaded = false;
+let historySelectedDate = null;
+
+async function loadHistory() {
+  const el = document.getElementById('content');
+  renderTabs();
+  el.innerHTML = `<div style="text-align:center;padding:60px 20px">
+    <div style="font-size:32px;margin-bottom:16px">📅</div>
+    <p style="color:var(--accent);font-size:14px">Memuat riwayat 7 hari...</p>
+  </div>`;
+
+  historyData = {};
+  
+  // Generate last 7 dates
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    dates.push(d.getFullYear() + "-" + mm + "-" + dd);
+  }
+
+  // Fetch data for each date
+  for (const date of dates) {
+    try {
+      const url = SCRIPT_URL + "?action=getAll&date=" + encodeURIComponent(date) + "&t=" + Date.now();
+      const resp = await fetch(url);
+      const json = await resp.json();
+      if (json.data && Array.isArray(json.data)) {
+        historyData[date] = json.data;
+      } else {
+        historyData[date] = [];
+      }
+    } catch(e) {
+      historyData[date] = [];
+    }
+  }
+
+  historyLoaded = true;
+  historySelectedDate = null;
+  render();
+}
+
+function renderRiwayat() {
+  const dates = Object.keys(historyData).sort().reverse();
+  
+  if (dates.length === 0) {
+    return `<div style="text-align:center;padding:60px 20px;color:var(--text-muted)">
+      <div style="font-size:32px;margin-bottom:12px">📅</div>
+      <p>Belum ada data riwayat</p>
+      <button class="btn-accent" onclick="loadHistory()" style="margin-top:16px">🔄 Muat Riwayat</button>
+    </div>`;
+  }
+
+  // If a date is selected, show detail
+  if (historySelectedDate) {
+    return renderRiwayatDetail(historySelectedDate);
+  }
+
+  // Show date list with summary
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px">Riwayat 7 Hari</p>
+    </div>
+    <button class="btn-accent" onclick="historyLoaded=false;loadHistory()">🔄</button>
+  </div>`;
+
+  dates.forEach(date => {
+    const rows = historyData[date] || [];
+    const dateObj = new Date(date + "T00:00:00");
+    const dateStr = dateObj.toLocaleDateString("id-ID", {weekday:"long", day:"numeric", month:"short"});
+    const isToday = date === today;
+
+    // Count unique members who filled data
+    const filledMembers = new Set();
+    let totalDone = 0;
+    rows.forEach(row => {
+      const amalan = amalanList.find(a => a.id === row.amalanId || a.name === row.amalanName);
+      if (!amalan) return;
+      if (amalan.type === "check" && (row.value === "Ya" || row.value === "true")) {
+        filledMembers.add(row.nama);
+        totalDone++;
+      } else if (amalan.type === "number" && parseInt(row.value) > 0) {
+        filledMembers.add(row.nama);
+        totalDone++;
+      }
+    });
+
+    const totalPossible = members.length * amalanList.length;
+    const pct = totalPossible > 0 ? Math.round((totalDone / totalPossible) * 100) : 0;
+    const barColor = pct >= 70 ? "var(--green)" : pct >= 30 ? "var(--accent)" : "var(--red)";
+
+    html += `<div onclick="historySelectedDate='${date}';render()" class="card" style="cursor:pointer;transition:all 0.2s;padding:16px" onmouseover="this.style.borderColor='rgba(201,169,110,0.4)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <span style="font-size:15px;font-weight:500">${dateStr}</span>
+          ${isToday ? '<span style="margin-left:8px;font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(201,169,110,0.15);color:var(--accent);font-weight:600">HARI INI</span>' : ''}
+        </div>
+        <span style="font-size:13px;font-weight:600;color:${barColor}">${pct}%</span>
+      </div>
+      <div style="width:100%;height:6px;border-radius:3px;background:var(--border-subtle);overflow:hidden">
+        <div style="width:${pct}%;height:100%;border-radius:3px;background:${barColor};transition:width 0.6s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px">
+        <span style="font-size:11px;color:var(--text-muted)">${filledMembers.size}/${members.length} anggota isi</span>
+        <span style="font-size:11px;color:var(--text-muted)">${totalDone}/${totalPossible} amalan ✓</span>
+      </div>
+    </div>`;
+  });
+
+  return html;
+}
+
+function renderRiwayatDetail(date) {
+  const rows = historyData[date] || [];
+  const dateObj = new Date(date + "T00:00:00");
+  const dateStr = dateObj.toLocaleDateString("id-ID", {weekday:"long", day:"numeric", month:"long", year:"numeric"});
+
+  let html = `<button onclick="historySelectedDate=null;render()" style="background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer;padding:4px 0;margin-bottom:16px">← Kembali</button>
+  <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Riwayat Amalan</p>
+  <p style="font-size:16px;color:var(--accent);margin-bottom:20px;font-weight:500">📅 ${dateStr}</p>`;
+
+  // Per member card
+  members.forEach((m, mi) => {
+    const memberRows = rows.filter(r => r.nama === m.name);
+    
+    // Count done
+    let done = 0;
+    amalanList.forEach(a => {
+      const row = memberRows.find(r => r.amalanId === a.id || r.amalanName === a.name);
+      if (a.type === "check" && row && (row.value === "Ya" || row.value === "true")) done++;
+      else if (a.type === "number" && row && parseInt(row.value) > 0) done++;
+    });
+    const pct = amalanList.length > 0 ? Math.round((done / amalanList.length) * 100) : 0;
+
+    html += `<div class="card" style="padding:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,${COLORS[mi%COLORS.length]}88,${COLORS[mi%COLORS.length]});display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:600">${m.name[0]}</div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:500">${m.name}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${done}/${amalanList.length} amalan • ${pct}%</div>
+        </div>
+      </div>`;
+
+    amalanList.forEach(a => {
+      const row = memberRows.find(r => r.amalanId === a.id || r.amalanName === a.name);
+      let isDone = false;
+      let display = "—";
+
+      if (row) {
+        if (a.type === "check") {
+          isDone = (row.value === "Ya" || row.value === "true");
+          display = isDone ? "✓ Sudah" : "✗ Belum";
+        } else {
+          const val = parseInt(row.value) || 0;
+          isDone = val > 0;
+          display = val + " " + (a.unit || "kali");
+        }
+      }
+
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border-subtle)">
+        <span style="font-size:16px;width:24px;text-align:center">${a.icon}</span>
+        <span style="flex:1;font-size:13px">${a.name}</span>
+        <span style="padding:3px 10px;border-radius:6px;font-size:12px;font-weight:500;background:${isDone?'rgba(110,201,169,0.12)':'rgba(255,255,255,0.04)'};color:${isDone?'var(--green)':'var(--text-muted)'}">${display}</span>
+      </div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  return html;
+}
 setInterval(async () => {
   if (!document.getElementById('mainApp').classList.contains('hidden')) {
     const newToday = new Date().toISOString().slice(0,10);
@@ -458,11 +634,21 @@ setInterval(async () => {
 
 // ============ TABS ============
 function renderTabs() {
-  const tabs = [{id:"rekap",label:"Rekap"},{id:"input",label:"Input Harian"}];
+  const tabs = [{id:"rekap",label:"Rekap"},{id:"input",label:"Input Harian"},{id:"riwayat",label:"📅 Riwayat"}];
   if (isAdmin) tabs.push({id:"kelola",label:"⚙ Kelola"});
   document.getElementById('tabBar').innerHTML = tabs.map(t =>
-    `<button onclick="activeTab='${t.id}';selectedMember=null;render()" style="padding:14px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);font-size:14px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.2s" class="${activeTab===t.id?'tab-active':''}">${t.label}</button>`
+    `<button onclick="switchTab('${t.id}')" style="padding:14px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);font-size:14px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.2s" class="${activeTab===t.id?'tab-active':''}">${t.label}</button>`
   ).join('');
+}
+
+function switchTab(tabId) {
+  activeTab = tabId;
+  selectedMember = null;
+  if (tabId === "riwayat" && !historyLoaded) {
+    loadHistory();
+  } else {
+    render();
+  }
 }
 
 // ============ RENDER ============
@@ -473,6 +659,7 @@ function render() {
   else if (activeTab==="input" && pinAttemptMember) el.innerHTML = renderPinPrompt();
   else if (activeTab==="input" && !selectedMember) el.innerHTML = renderInputSelect();
   else if (activeTab==="input" && selectedMember) el.innerHTML = renderInputForm();
+  else if (activeTab==="riwayat") el.innerHTML = renderRiwayat();
   else if (activeTab==="kelola" && isAdmin) el.innerHTML = renderKelola();
 }
 
@@ -748,14 +935,15 @@ window.addEventListener('popstate', function(e) {
 
   // Handle back navigation within the app
   if (pinAttemptMember) {
-    // In PIN prompt → go back to member select
     cancelPin();
+  } else if (historySelectedDate) {
+    // In riwayat detail → go back to riwayat list
+    historySelectedDate = null;
+    render();
   } else if (selectedMember) {
-    // In member detail/input form → go back to member select
     selectedMember = null;
     render();
   } else if (activeTab !== "rekap") {
-    // In Input/Kelola tab → go back to Rekap
     activeTab = "rekap";
     render();
   }
