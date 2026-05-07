@@ -1,910 +1,306 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#0a1628">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Amaliyah">
-<title>☪ Amaliyah Kelompok</title>
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a1628' width='100' height='100' rx='20'/><text x='50' y='60' text-anchor='middle' font-size='50'>☪</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg: #0a1628;
-  --bg-card: rgba(255,255,255,0.04);
-  --bg-card-hover: rgba(255,255,255,0.07);
-  --border: rgba(255,255,255,0.08);
-  --border-subtle: rgba(255,255,255,0.06);
-  --text-primary: #e8e0d4;
-  --text-secondary: rgba(255,255,255,0.5);
-  --text-muted: rgba(255,255,255,0.3);
-  --accent: #c9a96e;
-  --accent-glow: rgba(201,169,110,0.15);
-  --green: #6ec9a9;
-  --red: #c96e6e;
-}
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:var(--bg); color:var(--text-primary); font-family:'Outfit',sans-serif; min-height:100vh; }
-input,button { font-family:'Outfit',sans-serif; }
-input:focus { outline:none; border-color:rgba(232,213,183,0.4) !important; }
-.card { background:var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:20px; margin-bottom:16px; }
-.btn-accent { padding:8px 16px; background:var(--accent-glow); border:1px solid rgba(201,169,110,0.3); border-radius:10px; color:var(--accent); font-size:13px; cursor:pointer; font-weight:500; }
-.btn-gold { padding:12px 20px; background:linear-gradient(135deg,#c9a96e,#e8d5b7); border:none; border-radius:12px; color:#0a1628; font-size:14px; font-weight:600; cursor:pointer; }
-.btn-gold:hover { transform:translateY(-1px); box-shadow:0 8px 24px rgba(201,169,110,0.3); }
-.input-field { width:100%; padding:12px 14px; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:10px; color:#fff; font-size:14px; }
-.hidden { display:none !important; }
-.tab-active { border-bottom:2px solid var(--accent) !important; color:var(--accent) !important; font-weight:600 !important; }
-</style>
-</head>
-<body>
+// ============================================
+// APPS SCRIPT - Amaliyah Kelompok v2
+// ============================================
+// Sheet "Config" = JSON config di cell A1
+// Sheet "Data"   = rekap amalan harian (per-cell update)
+// ============================================
+// CARA DEPLOY:
+// 1. Buka Google Sheets → Extensions → Apps Script
+// 2. Hapus semua kode lama, paste kode ini
+// 3. Deploy → New Deployment → Web App
+//    - Execute as: Me
+//    - Who has access: Anyone
+// 4. Copy URL deployment baru, ganti di index.html
+//
+// SETUP AUTO RESET (opsional, bersihkan data >7 hari):
+// 5. Di Apps Script, klik ikon jam ⏰ (Triggers) di sidebar kiri
+// 6. + Add Trigger:
+//    - Function: dailyReset
+//    - Event source: Time-driven
+//    - Type: Day timer
+//    - Time of day: Midnight to 1am
+// 7. Save → Authorize
+// ============================================
 
-<!-- ============ LOGIN SCREEN ============ -->
-<div id="loginScreen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#0a1628 0%,#132744 40%,#1a3a5c 100%);padding:20px">
-  <div style="width:100%;max-width:400px;background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);border-radius:24px;padding:48px 36px;border:1px solid rgba(255,255,255,0.08);box-shadow:0 32px 64px rgba(0,0,0,0.4)">
-    <div style="text-align:center;margin-bottom:40px">
-      <div style="font-size:40px;margin-bottom:8px">☪</div>
-      <h1 style="font-family:'Amiri',serif;font-size:28px;color:#e8d5b7;letter-spacing:1px">Amaliyah Kelompok</h1>
-      <p style="color:rgba(255,255,255,0.4);font-size:13px;margin-top:8px;letter-spacing:2px;text-transform:uppercase">Rekap Ibadah Harian</p>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div>
-        <label style="color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;display:block">Username</label>
-        <input id="loginUser" class="input-field" placeholder="Masukkan username">
-      </div>
-      <div>
-        <label style="color:rgba(255,255,255,0.5);font-size:11px;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;display:block">Password</label>
-        <div style="position:relative">
-          <input id="loginPass" type="password" class="input-field" placeholder="Masukkan password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:44px">
-          <button onclick="togglePass()" id="eyeBtn" type="button" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-secondary);font-size:18px;cursor:pointer;padding:4px 8px">👁</button>
-        </div>
-      </div>
-      <div id="loginError" class="hidden" style="padding:10px 14px;background:rgba(220,80,80,0.15);border-radius:8px;color:#f0a0a0;font-size:13px;text-align:center"></div>
-      <button class="btn-gold" style="margin-top:8px" onclick="doLogin()">Masuk</button>
-    </div>
-  </div>
-</div>
+function doGet(e) {
+  var action = (e && e.parameter) ? e.parameter.action : "";
 
-<!-- ============ MAIN APP ============ -->
-<div id="mainApp" class="hidden">
-  <!-- HEADER -->
-  <div style="padding:24px 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(10,22,40,0.95);backdrop-filter:blur(16px);z-index:100">
-    <div>
-      <h1 style="font-family:'Amiri',serif;font-size:22px;color:#e8d5b7">☪ Amaliyah</h1>
-      <p id="dateDisplay" style="font-size:12px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase"></p>
-      <span id="adminBadge" class="hidden" style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:6px;background:rgba(201,169,110,0.15);color:var(--accent);font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase">ADMIN</span>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn-accent" onclick="refreshData()" title="Refresh">🔄</button>
-      <button class="btn-accent" onclick="refreshFromSheet()" id="refreshBtn" title="Refresh data dari server">🔄</button>
-      <button class="btn-accent" onclick="syncToSheet()" id="syncBtn">💾 Save</button>
-      <button onclick="doLogout()" style="padding:8px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;color:var(--text-secondary);font-size:13px;cursor:pointer">Keluar</button>
-    </div>
-  </div>
-  <div id="syncStatus" class="hidden" style="padding:10px 20px;text-align:center;font-size:13px"></div>
-
-  <!-- TABS -->
-  <div id="tabBar" style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 20px"></div>
-
-  <!-- CONTENT -->
-  <div id="content" style="padding:20px;max-width:800px;margin:0 auto"></div>
-</div>
-
-<script>
-// ============ CONFIG ============
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbLGBOCMLSHoI42dr3tnnprJN2SLXo5ghWceYV9tAni3IQH8lA8ESWcCphX8leoPa8/exec";
-
-const COLORS = ["#c9a96e","#6ec9a9","#6ea9c9","#c96e9a","#9a6ec9","#c9916e","#6ec96e","#c9c96e","#6e8fc9","#c96e6e"];
-
-// ============ STATE ============
-let isAdmin = false;
-let members = [];
-let amalanList = [];
-let records = {};
-let activeTab = "rekap";
-let selectedMember = null;
-let today = new Date().toISOString().slice(0,10);
-let configLoaded = false;
-
-// Default config (used only if Sheet has no config yet)
-const DEFAULT_MEMBERS = [
-  {name:"Akhi Fulan", pin:"000000"},
-  {name:"Akhi 2", pin:"000000"},
-  {name:"Akhi 3", pin:"000000"},
-  {name:"Akhi 4", pin:"000000"},
-  {name:"Akhi 5", pin:"000000"}
-];
-const DEFAULT_AMALAN = [
-  {id:"subuh",name:"Shalat Subuh",type:"check",icon:"🌅"},
-  {id:"dhuha",name:"Shalat Dhuha",type:"check",icon:"☀️"},
-  {id:"dzuhur",name:"Shalat Dzuhur",type:"check",icon:"🕐"},
-  {id:"ashar",name:"Shalat Ashar",type:"check",icon:"🌤"},
-  {id:"maghrib",name:"Shalat Maghrib",type:"check",icon:"🌇"},
-  {id:"isya",name:"Shalat Isya",type:"check",icon:"🌙"},
-  {id:"tahajud",name:"Tahajud",type:"check",icon:"🌌"},
-  {id:"quran",name:"Baca Quran",type:"number",unit:"lembar",icon:"📖"},
-  {id:"dzikir_pagi",name:"Dzikir Pagi",type:"check",icon:"🌿"},
-  {id:"dzikir_petang",name:"Dzikir Petang",type:"check",icon:"🍃"},
-  {id:"sedekah",name:"Sedekah",type:"check",icon:"💝"},
-  {id:"puasa",name:"Puasa Sunnah",type:"check",icon:"🕌"}
-];
-
-// ============ LOAD CONFIG FROM SHEET ============
-async function loadConfig() {
-  try {
-    const resp = await fetch(SCRIPT_URL + "?action=getConfig&t=" + Date.now());
-    const data = await resp.json();
-    if (data && data.members && data.members.length > 0) {
-      members = data.members;
-      amalanList = data.amalan;
-      configLoaded = true;
-      return true;
-    }
-  } catch(e) {
-    console.log("Config load error:", e);
+  // === NEW: getAll = config + amalan data for today ===
+  if (action === "getAll") {
+    var date = e.parameter.date || "";
+    return getAllData(date);
   }
-  // Fallback to defaults
-  members = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
-  amalanList = JSON.parse(JSON.stringify(DEFAULT_AMALAN));
-  configLoaded = true;
-  return false;
+
+  // === EXISTING: getConfig ===
+  if (action === "getConfig") {
+    return getConfig();
+  }
+
+  // === EXISTING: saveConfig via GET ===
+  if (action === "saveConfig") {
+    var payload = e.parameter.payload;
+    var data = JSON.parse(payload);
+    return saveConfigData(data);
+  }
+
+  // === EXISTING: saveData via GET (bulk) ===
+  if (action === "saveData") {
+    var payload = e.parameter.payload;
+    var data = JSON.parse(payload);
+    return saveAmalanData(data);
+  }
+
+  return ContentService.createTextOutput("Amaliyah API v2 Ready");
 }
 
-// ============ SAVE CONFIG TO SHEET (ADMIN) ============
-async function saveConfig() {
-  const btn = document.getElementById('saveConfigBtn');
-  const status = document.getElementById('syncStatus');
-  if (btn) { btn.textContent = "⏳ Menyimpan..."; btn.disabled = true; }
-  status.classList.remove('hidden');
-  status.style.background = "rgba(110,201,169,0.1)";
-  status.style.color = "var(--green)";
-  status.textContent = "Menyimpan pengaturan...";
-
+function doPost(e) {
   try {
-    const payload = encodeURIComponent(JSON.stringify({
-      members: members,
-      amalan: amalanList
-    }));
-    const url = SCRIPT_URL + "?action=saveConfig&payload=" + payload + "&t=" + Date.now();
-    
-    const resp = await fetch(url);
-    const result = await resp.text();
-    
-    if (result.includes("saved") || result.includes("OK")) {
-      status.textContent = "✅ Pengaturan tersimpan! Semua HP akan dapat data yang sama.";
-    } else {
-      status.textContent = "⚠️ Response: " + result.substring(0, 100);
+    var raw = "";
+    if (e.parameter && e.parameter.payload) {
+      raw = e.parameter.payload;
+    } else if (e.postData && e.postData.contents) {
+      raw = e.postData.contents;
     }
+    if (!raw) return ContentService.createTextOutput("No data");
+
+    var data = JSON.parse(raw);
+
+    // === NEW: saveAmalan (per-cell real-time save) ===
+    if (data.action === "saveAmalan") {
+      return saveAmalanCell(data);
+    }
+
+    // === EXISTING: saveConfig via POST ===
+    if (data.action === "saveConfig") {
+      return saveConfigData(data);
+    }
+
+    // === EXISTING: bulk save ===
+    return saveAmalanData(data);
   } catch(err) {
-    status.style.background = "rgba(220,80,80,0.1)";
-    status.style.color = "var(--red)";
-    status.textContent = "❌ Gagal: " + err.message;
+    return ContentService.createTextOutput("Error: " + err.message);
   }
-  if (btn) { btn.textContent = "💾 Save Pengaturan"; btn.disabled = false; }
-  setTimeout(() => status.classList.add('hidden'), 4000);
 }
 
-// ============ LOAD AMALAN DATA FROM SHEET ============
-async function loadAmalanData() {
-  try {
-    const url = SCRIPT_URL + "?action=getData&date=" + encodeURIComponent(today) + "&t=" + Date.now();
-    const resp = await fetch(url);
-    const data = await resp.json();
-    if (data && Array.isArray(data) && data.length > 0) {
-      data.forEach(row => {
-        if (row.nama && row.amalanId) {
-          let val = row.value;
-          if (row.type === "check") {
-            val = (val === true || val === "true" || val === "Ya" || val === "1");
-          } else {
-            val = parseInt(val) || 0;
-          }
-          records[`${row.nama}_${today}_${row.amalanId}`] = val;
-        }
-      });
-      return true;
+// ============================================
+// NEW: GET ALL DATA (config + amalan for date)
+// Called on every app open so all phones see same data
+// ============================================
+function getAllData(date) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var result = { config: { members: [], amalan: [] }, data: [] };
+
+  // Load config
+  var configSheet = ss.getSheetByName("Config");
+  if (configSheet) {
+    var raw = configSheet.getRange("A1").getValue();
+    if (raw) {
+      try { result.config = JSON.parse(raw); } catch(e) {}
     }
-  } catch(e) {
-    console.log("Load amalan data error:", e);
   }
-  return false;
-}
 
-// ============ AUTO-SAVE SINGLE AMALAN TO SHEET ============
-function saveSingleAmalan(memberName, amalanId, value, type) {
-  try {
-    const amalan = amalanList.find(a => a.id === amalanId);
-    const amalanName = amalan ? amalan.name : amalanId;
-    const saveVal = type === "check" ? (value ? "Ya" : "Tidak") : value;
-    const payload = encodeURIComponent(JSON.stringify({
-      action: "saveAmalan",
-      tanggal: today,
-      nama: memberName,
-      amalanId: amalanId,
-      amalanName: amalanName,
-      value: saveVal,
-      type: type
-    }));
-    const url = SCRIPT_URL + "?action=saveAmalan&payload=" + payload + "&t=" + Date.now();
-    fetch(url).catch(e => console.log("Auto-save error:", e));
-  } catch(e) {
-    console.log("Auto-save error:", e);
-  }
-}
-
-// ============ HELPERS ============
-function getRecord(memberName, amalanId) { return records[`${memberName}_${today}_${amalanId}`]; }
-function setRecordVal(memberName, amalanId, val) {
-  records[`${memberName}_${today}_${amalanId}`] = val;
-  // Auto-save ke Google Sheets
-  const amalan = amalanList.find(a => a.id === amalanId);
-  if (amalan) saveSingleAmalan(memberName, amalanId, val, amalan.type);
-  render();
-}
-
-function getMemberStats(memberName) {
-  let done=0;
-  amalanList.forEach(a => {
-    const v = getRecord(memberName, a.id);
-    if (a.type==="check" && v) done++;
-    else if (a.type==="number" && v>0) done++;
-  });
-  return {done, total:amalanList.length, pct: amalanList.length>0 ? (done/amalanList.length)*100 : 0};
-}
-
-function getGroupStats() {
-  let total = members.length * amalanList.length, done=0;
-  members.forEach(m => amalanList.forEach(a => {
-    const v = getRecord(m.name, a.id);
-    if (a.type==="check" && v) done++;
-    else if (a.type==="number" && v>0) done++;
-  }));
-  return {done, total, pct: total>0 ? (done/total)*100 : 0};
-}
-
-function getAmalanStats(aId, aType) {
-  let done=0;
-  members.forEach(m => { const v=getRecord(m.name,aId); if(aType==="check"&&v) done++; else if(aType==="number"&&v>0) done++; });
-  return {done, total:members.length, pct:(done/members.length)*100};
-}
-
-function memberByName(name) { return members.find(m => m.name === name); }
-
-// PIN prompt for member access
-let pinAttemptMember = null;
-function trySelectMember(memberName) {
-  if (isAdmin) { selectedMember = memberName; render(); return; }
-  pinAttemptMember = memberName;
-  render();
-}
-
-function submitPin() {
-  const input = document.getElementById('pinInput');
-  const pin = input ? input.value : '';
-  const member = memberByName(pinAttemptMember);
-  if (member && pin === member.pin) {
-    selectedMember = pinAttemptMember;
-    pinAttemptMember = null;
-    render();
-  } else {
-    const err = document.getElementById('pinError');
-    if (err) { err.classList.remove('hidden'); err.textContent = 'PIN salah!'; }
-    if (input) input.value = '';
-  }
-}
-
-function cancelPin() { pinAttemptMember = null; render(); }
-
-function donut(pct, size=120, sw=10, color="#c9a96e") {
-  const r=(size-sw)/2, c=2*Math.PI*r, off=c-(pct/100)*c, cx=size/2;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    <circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="var(--border-subtle)" stroke-width="${sw}"/>
-    <circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-dasharray="${c}" stroke-dashoffset="${off}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cx})" style="transition:stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)"/>
-    <text x="${cx}" y="${cx}" text-anchor="middle" dominant-baseline="central" style="font-size:${size*0.22}px;font-weight:700;fill:var(--text-primary);font-family:'Outfit',sans-serif">${Math.round(pct)}%</text>
-  </svg>`;
-}
-
-function miniBar(val, max, color) {
-  const pct = max>0 ? Math.min((val/max)*100,100) : 0;
-  return `<div style="width:100%;height:6px;border-radius:3px;background:var(--border-subtle);overflow:hidden"><div style="width:${pct}%;height:100%;border-radius:3px;background:${color};transition:width 0.6s"></div></div>`;
-}
-
-// ============ TOGGLE PASSWORD VISIBILITY ============
-function togglePass() {
-  const input = document.getElementById('loginPass');
-  const btn = document.getElementById('eyeBtn');
-  if (input.type === 'password') {
-    input.type = 'text';
-    btn.textContent = '🙈';
-  } else {
-    input.type = 'password';
-    btn.textContent = '👁';
-  }
-}
-
-// ============ LOGIN ============
-function doLogin() {
-  const u = document.getElementById('loginUser').value;
-  const p = document.getElementById('loginPass').value;
-  if (u==="upasenin" && p==="seninmalem") { isAdmin=false; showApp(); }
-  else if (u==="upasenin" && p==="upaseninadmin") { isAdmin=true; showApp(); }
-  else { const el=document.getElementById('loginError'); el.classList.remove('hidden'); el.textContent="Username atau password salah!"; }
-}
-
-function doLogout() {
-  isAdmin=false; activeTab="rekap"; selectedMember=null;
-  document.getElementById('mainApp').classList.add('hidden');
-  document.getElementById('loginScreen').classList.remove('hidden');
-  document.getElementById('loginUser').value='';
-  document.getElementById('loginPass').value='';
-}
-
-async function showApp() {
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('mainApp').classList.remove('hidden');
-  document.getElementById('dateDisplay').textContent = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  if (isAdmin) document.getElementById('adminBadge').classList.remove('hidden');
-  else document.getElementById('adminBadge').classList.add('hidden');
-
-  // Show loading while fetching config
-  document.getElementById('content').innerHTML = `
-    <div style="text-align:center;padding:60px 20px">
-      <div style="font-size:32px;margin-bottom:16px">☪</div>
-      <p style="color:var(--accent);font-size:14px">Memuat data kelompok...</p>
-    </div>`;
-  renderTabs();
-
-  // Load config from Google Sheets
-  await loadConfig();
-  // Load data amalan hari ini dari Sheet
-  await loadAmalanData();
-
-  render();
-  // Show install popup after login with short delay
-  setTimeout(() => {
-    if (deferredPrompt) showInstallPopup();
-    else if (/iPhone|iPad/.test(navigator.userAgent) && !window.matchMedia('(display-mode: standalone)').matches) showIOSInstallPopup();
-  }, 1500);
-}
-
-// ============ SAVE to Google Sheets (via GET - proven working) ============
-async function syncToSheet() {
-  const btn = document.getElementById('syncBtn');
-  const status = document.getElementById('syncStatus');
-  btn.textContent = "⏳ Menyimpan...";
-  btn.disabled = true;
-  status.classList.remove('hidden');
-  status.style.background = "rgba(110,201,169,0.1)";
-  status.style.color = "var(--green)";
-  status.textContent = "Menyimpan data...";
-
-  try {
-    const hdrs = ["tanggal","nama", ...amalanList.map(a=>a.name)];
-    const rows = [];
-    members.forEach(member => {
-      let hasData = false;
-      amalanList.forEach(a => {
-        const v = getRecord(member.name, a.id);
-        if (a.type === "check" && v) hasData = true;
-        if (a.type === "number" && v > 0) hasData = true;
-      });
-
-      if (hasData) {
-        const row = {tanggal: today, nama: member.name};
-        amalanList.forEach(a => {
-          const v = getRecord(member.name, a.id);
-          if (a.type === "check") row[a.name] = v ? "Ya" : "Tidak";
-          else row[a.name] = v || 0;
+  // Load amalan data for specific date
+  var dataSheet = ss.getSheetByName("Data");
+  if (dataSheet && dataSheet.getLastRow() > 1) {
+    var all = dataSheet.getDataRange().getValues();
+    // Headers: tanggal | nama | amalanId | amalanName | value | type
+    for (var i = 1; i < all.length; i++) {
+      var rowDate = formatDate(all[i][0]);
+      if (rowDate === date) {
+        result.data.push({
+          tanggal: rowDate,
+          nama: str(all[i][1]),
+          amalanId: str(all[i][2]),
+          amalanName: str(all[i][3]),
+          value: str(all[i][4]),
+          type: str(all[i][5])
         });
-        rows.push(row);
       }
-    });
-
-    if (rows.length === 0) {
-      status.style.background = "rgba(220,180,80,0.1)";
-      status.style.color = "#e8c56e";
-      status.textContent = "⚠️ Belum ada data yang diisi!";
-      btn.textContent = "💾 Save";
-      btn.disabled = false;
-      setTimeout(() => status.classList.add('hidden'), 3000);
-      return;
     }
+  }
 
-    // Send via GET using fetch (doGet proven working)
-    const payload = encodeURIComponent(JSON.stringify({headers: hdrs, data: rows}));
-    const url = SCRIPT_URL + "?action=saveData&payload=" + payload + "&t=" + Date.now();
-    
-    status.textContent = "📤 Mengirim " + rows.length + " data...";
-    
-    const resp = await fetch(url);
-    const result = await resp.text();
-    
-    if (result.includes("OK")) {
-      status.textContent = "✅ Tersimpan! (" + rows.length + " anggota)";
-    } else {
-      status.textContent = "⚠️ Response: " + result.substring(0, 100);
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ============================================
+// NEW: SAVE AMALAN CELL (real-time per-click)
+// Upsert: update existing row or insert new
+// ============================================
+function saveAmalanCell(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Data");
+
+  // Create sheet + headers if needed
+  if (!sheet) {
+    sheet = ss.insertSheet("Data");
+    sheet.appendRow(["tanggal", "nama", "amalanId", "amalanName", "value", "type"]);
+  }
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(["tanggal", "nama", "amalanId", "amalanName", "value", "type"]);
+  }
+
+  var tanggal = data.tanggal;
+  var nama = data.nama;
+  var amalanId = data.amalanId;
+
+  // Search for existing row
+  var found = false;
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var rows = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      var rd = formatDate(rows[i][0]);
+      if (rd === tanggal && rows[i][1] == nama && rows[i][2] == amalanId) {
+        // Update value + type
+        sheet.getRange(i + 2, 5).setValue(data.value);
+        sheet.getRange(i + 2, 6).setValue(data.type);
+        found = true;
+        break;
+      }
     }
+  }
+
+  // Insert new row if not found
+  if (!found) {
+    sheet.appendRow([tanggal, nama, amalanId, data.amalanName || "", data.value, data.type || "check"]);
+  }
+
+  return ContentService.createTextOutput("OK");
+}
+
+// ============================================
+// EXISTING: GET CONFIG
+// ============================================
+function getConfig() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName("Config");
+
+  if (!configSheet) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ members: [], amalan: [] }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var data = configSheet.getRange("A1").getValue();
+  if (!data) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ members: [], amalan: [] }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    var config = JSON.parse(data);
+    return ContentService
+      .createTextOutput(JSON.stringify(config))
+      .setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
-    status.style.background = "rgba(220,80,80,0.1)";
-    status.style.color = "var(--red)";
-    status.textContent = "❌ Gagal: " + err.message;
+    return ContentService
+      .createTextOutput(JSON.stringify({ members: [], amalan: [] }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-  btn.textContent = "💾 Save";
-  btn.disabled = false;
-  setTimeout(() => status.classList.add('hidden'), 5000);
 }
 
-// Debug: test connection by opening script URL in new tab
-function testConnection() {
-  window.open(SCRIPT_URL, '_blank');
-}
+// ============================================
+// EXISTING: SAVE CONFIG
+// ============================================
+function saveConfigData(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName("Config");
 
-// Debug: test POST with visible result
-function testPost() {
-  const payload = JSON.stringify({
-    headers: ["tanggal", "nama", "test"],
-    data: [{ tanggal: today, nama: "TEST", test: "OK" }]
-  });
-  
-  // Open form in new tab so we can see the response
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = SCRIPT_URL;
-  form.target = '_blank';
-  
-  const input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = 'payload';
-  input.value = payload;
-  form.appendChild(input);
-  
-  document.body.appendChild(form);
-  form.submit();
-  document.body.removeChild(form);
-}
-
-// ============ REFRESH FROM SHEET ============
-async function refreshFromSheet() {
-  const btn = document.getElementById('refreshBtn');
-  const status = document.getElementById('syncStatus');
-  btn.textContent = "⏳";
-  btn.disabled = true;
-  status.classList.remove('hidden');
-  status.style.background = "rgba(110,201,169,0.1)";
-  status.style.color = "var(--green)";
-  status.textContent = "🔄 Memuat data terbaru...";
-  await loadConfig();
-  await loadAmalanData();
-  render();
-  status.textContent = "✅ Data diperbarui!";
-  btn.textContent = "🔄";
-  btn.disabled = false;
-  setTimeout(() => status.classList.add('hidden'), 3000);
-}
-
-// ============ AUTO-REFRESH TIAP 2 MENIT ============
-setInterval(async () => {
-  if (!document.getElementById('mainApp').classList.contains('hidden')) {
-    const newToday = new Date().toISOString().slice(0,10);
-    if (newToday !== today) {
-      today = newToday;
-      records = {};
-      document.getElementById('dateDisplay').textContent = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-    }
-    await loadAmalanData();
-    render();
+  if (!configSheet) {
+    configSheet = ss.insertSheet("Config");
   }
-}, 120000);
 
-// ============ TABS ============
-function renderTabs() {
-  const tabs = [{id:"rekap",label:"Rekap"},{id:"input",label:"Input Harian"}];
-  if (isAdmin) tabs.push({id:"kelola",label:"⚙ Kelola"});
-  document.getElementById('tabBar').innerHTML = tabs.map(t =>
-    `<button onclick="activeTab='${t.id}';selectedMember=null;render()" style="padding:14px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);font-size:14px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.2s" class="${activeTab===t.id?'tab-active':''}">${t.label}</button>`
-  ).join('');
+  var config = {
+    members: data.members,
+    amalan: data.amalan
+  };
+
+  configSheet.getRange("A1").setValue(JSON.stringify(config));
+  return ContentService.createTextOutput("Config saved OK");
 }
 
-// ============ RENDER ============
-function render() {
-  renderTabs();
-  const el = document.getElementById('content');
-  if (activeTab==="rekap") el.innerHTML = renderRekap();
-  else if (activeTab==="input" && pinAttemptMember) el.innerHTML = renderPinPrompt();
-  else if (activeTab==="input" && !selectedMember) el.innerHTML = renderInputSelect();
-  else if (activeTab==="input" && selectedMember) el.innerHTML = renderInputForm();
-  else if (activeTab==="kelola" && isAdmin) el.innerHTML = renderKelola();
-}
+// ============================================
+// EXISTING: SAVE AMALAN DATA (bulk - from Save button)
+// ============================================
+function saveAmalanData(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var dataSheet = ss.getSheetByName("Data");
 
-// ---- REKAP ----
-function renderRekap() {
-  const gs = getGroupStats();
-  const dateStr = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  
-  // Count members who have filled at least 1 amalan
-  let membersFilled = 0;
-  members.forEach(m => {
-    let hasData = false;
-    amalanList.forEach(a => {
-      const v = getRecord(m.name, a.id);
-      if (a.type==="check" && v) hasData = true;
-      if (a.type==="number" && v > 0) hasData = true;
+  if (!dataSheet) {
+    dataSheet = ss.insertSheet("Data");
+  }
+
+  if (dataSheet.getLastRow() === 0) {
+    dataSheet.appendRow(data.headers);
+  }
+
+  data.data.forEach(function(row) {
+    var r = data.headers.map(function(h) {
+      return row[h] !== undefined ? row[h] : "";
     });
-    if (hasData) membersFilled++;
+    dataSheet.appendRow(r);
   });
-  const memberPct = members.length > 0 ? (membersFilled / members.length) * 100 : 0;
 
-  let html = `<div class="card" style="text-align:center;padding:28px">
-    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Rekap Amalan</p>
-    <p style="font-size:14px;color:var(--accent);margin-bottom:16px;font-weight:500">📅 ${dateStr}</p>
-    ${donut(memberPct,140,12)}
-    <p style="margin-top:12px;font-size:14px;color:var(--text-secondary)">${membersFilled} dari ${members.length} anggota sudah isi</p>
-  </div>`;
+  return ContentService.createTextOutput("OK - " + data.data.length + " rows saved");
+}
 
-  // Per amalan
-  html += `<div class="card"><p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:16px">Per Amalan</p>`;
-  amalanList.forEach((a,i) => {
-    const s = getAmalanStats(a.id, a.type);
-    html += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-      <span style="font-size:18px;width:28px;text-align:center">${a.icon}</span>
-      <div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <span style="font-size:13px">${a.name}</span><span style="font-size:12px;color:var(--text-muted)">${s.done}/${s.total}</span>
-      </div>${miniBar(s.done,s.total,COLORS[i%COLORS.length])}</div></div>`;
-  });
-  html += `</div>`;
+// ============================================
+// NEW: DAILY RESET
+// Deletes data older than 7 days to keep sheet clean.
+// Today's data is automatically "fresh" because the app
+// only loads rows matching today's date.
+//
+// Setup trigger: Triggers → + Add Trigger →
+//   Function: dailyReset
+//   Time-driven → Day timer → Midnight to 1am
+// ============================================
+function dailyReset() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Data");
+  if (!sheet || sheet.getLastRow() <= 1) return;
 
-  // Info box
-  if (!isAdmin) {
-    html += `<div class="card" style="text-align:center;padding:16px;border-color:rgba(201,169,110,0.15)">
-      <p style="font-size:13px;color:var(--text-secondary)">ℹ️ Untuk menambah/mengurangi anggota atau amalan, hubungi <span style="color:var(--accent);font-weight:500">Admin</span></p>
-    </div>`;
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  var toDelete = [];
+
+  for (var i = 0; i < rows.length; i++) {
+    var d = rows[i][0] instanceof Date ? rows[i][0] : new Date(rows[i][0]);
+    if (d < cutoff) toDelete.push(i + 2);
   }
 
-  return html;
+  // Delete from bottom up
+  toDelete.reverse().forEach(function(r) { sheet.deleteRow(r); });
+  Logger.log("dailyReset: removed " + toDelete.length + " old rows");
 }
 
-// ---- MEMBER DETAIL ----
-function renderMemberDetail() {
-  const mi = members.findIndex(m => m.name === selectedMember);
-  const s = getMemberStats(selectedMember);
-  let html = `<button onclick="selectedMember=null;render()" style="background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer;padding:4px 0;margin-bottom:16px">← Kembali</button>
-  <div class="card" style="text-align:center;padding:28px">
-    <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,${COLORS[mi%COLORS.length]},${COLORS[(mi+3)%COLORS.length]});display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px;color:#fff;font-weight:700">${selectedMember[0]}</div>
-    <h2 style="font-size:20px;font-weight:600;margin-bottom:4px">${selectedMember}</h2>
-    <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">Detail Amalan Hari Ini</p>
-    ${donut(s.pct,130,11,COLORS[mi%COLORS.length])}
-  </div><div class="card">`;
-  amalanList.forEach(a => {
-    const v = getRecord(selectedMember, a.id);
-    const done = a.type==="check" ? !!v : (v>0);
-    html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-subtle)">
-      <span style="font-size:20px;width:30px;text-align:center">${a.icon}</span>
-      <span style="flex:1;font-size:14px">${a.name}</span>
-      <span style="padding:4px 12px;border-radius:8px;font-size:12px;font-weight:500;background:${done?'rgba(110,201,169,0.12)':'rgba(255,255,255,0.04)'};color:${done?'var(--green)':'var(--text-muted)'}">
-        ${a.type==="check" ? (done?"✓ Sudah":"Belum") : (v?v+" "+(a.unit||""):"—")}
-      </span></div>`;
-  });
-  html += `</div>`;
-  return html;
-}
-
-// ---- INPUT SELECT ----
-function renderInputSelect() {
-  const dateStr = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  let html = `<p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Input Harian</p>
-  <p style="font-size:14px;color:var(--accent);margin-bottom:16px;font-weight:500">📅 ${dateStr}</p>
-  <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:12px">Pilih Anggota</p>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">`;
-  members.forEach((m,i) => {
-    const s = getMemberStats(m.name);
-    html += `<div onclick="trySelectMember('${m.name.replace(/'/g,"\\'")}')" style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 14px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(201,169,110,0.4)'" onmouseout="this.style.borderColor='var(--border)'">
-      ${donut(s.pct,60,5,COLORS[i%COLORS.length])}
-      <div style="color:var(--text-primary);font-size:14px;margin-top:8px">${m.name}</div>
-      <div style="color:var(--text-muted);font-size:11px;margin-top:2px">${s.done}/${s.total}</div>
-      <div style="font-size:10px;margin-top:4px;color:var(--text-muted)">🔒</div>
-    </div>`;
-  });
-  html += `</div>`;
-  if (!isAdmin) {
-    html += `<div class="card" style="text-align:center;padding:14px;margin-top:16px;border-color:rgba(201,169,110,0.15)">
-      <p style="font-size:12px;color:var(--text-secondary)">🔑 Minta PIN ke <span style="color:var(--accent);font-weight:500">Admin</span> untuk akses input amalan</p>
-    </div>`;
+// ============================================
+// HELPERS
+// ============================================
+function formatDate(val) {
+  if (!val) return "";
+  if (val instanceof Date) {
+    var dd = ("0" + val.getDate()).slice(-2);
+    var mm = ("0" + (val.getMonth() + 1)).slice(-2);
+    return val.getFullYear() + "-" + mm + "-" + dd;
   }
-  return html;
+  return val.toString();
 }
 
-// ---- PIN PROMPT ----
-function renderPinPrompt() {
-  const mi = members.findIndex(m => m.name === pinAttemptMember);
-  return `<button onclick="cancelPin()" style="background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer;padding:4px 0;margin-bottom:16px">← Kembali</button>
-  <div class="card" style="text-align:center;padding:32px">
-    <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,${COLORS[mi%COLORS.length]}88,${COLORS[mi%COLORS.length]});display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 16px;color:#fff;font-weight:700">${pinAttemptMember[0]}</div>
-    <h3 style="font-size:18px;font-weight:600;margin-bottom:4px">${pinAttemptMember}</h3>
-    <p style="color:var(--text-muted);font-size:13px;margin-bottom:24px">Masukkan PIN 6 digit</p>
-    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" 
-      onkeydown="if(event.key==='Enter')submitPin()"
-      style="width:160px;text-align:center;padding:14px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:12px;color:#fff;font-size:24px;letter-spacing:8px;outline:none;font-family:'Outfit',sans-serif">
-    <div id="pinError" class="hidden" style="margin-top:12px;padding:8px 14px;background:rgba(220,80,80,0.15);border-radius:8px;color:#f0a0a0;font-size:13px"></div>
-    <button onclick="submitPin()" class="btn-gold" style="margin-top:20px;width:160px">Masuk</button>
-  </div>`;
+function str(val) {
+  return val !== undefined && val !== null ? val.toString() : "";
 }
 
-// ---- INPUT FORM ----
-function renderInputForm() {
-  const dateStr = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  let html = `<button onclick="selectedMember=null;render()" style="background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer;padding:4px 0;margin-bottom:16px">← Pilih Anggota Lain</button>
-  <div class="card"><h3 style="margin-bottom:4px;font-size:16px;font-weight:500;color:var(--accent)">Input Amalan — ${selectedMember}</h3>
-  <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px">📅 ${dateStr}</p>`;
-  amalanList.forEach(a => {
-    const v = getRecord(selectedMember, a.id);
-    html += `<div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border-subtle)">
-      <span style="font-size:20px;width:30px;text-align:center">${a.icon}</span>
-      <span style="flex:1;font-size:14px">${a.name}</span>`;
-    if (a.type==="check") {
-      html += `<button onclick="setRecordVal('${selectedMember.replace(/'/g,"\\'")}','${a.id}',${!v})" style="width:40px;height:40px;border-radius:10px;border:1px solid ${v?'var(--green)':'var(--border)'};background:${v?'rgba(110,201,169,0.15)':'rgba(255,255,255,0.02)'};color:${v?'var(--green)':'var(--text-muted)'};font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">${v?'✓':''}</button>`;
-    } else {
-      const cv = v||0;
-      html += `<div style="display:flex;align-items:center;gap:6px">
-        <button onclick="setRecordVal('${selectedMember.replace(/'/g,"\\'")}','${a.id}',Math.max(0,${cv}-1))" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-secondary);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
-        <input type="number" value="${cv}" onchange="setRecordVal('${selectedMember.replace(/'/g,"\\'")}','${a.id}',Math.max(0,parseInt(this.value)||0))" style="width:50px;text-align:center;padding:6px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:14px">
-        <button onclick="setRecordVal('${selectedMember.replace(/'/g,"\\'")}','${a.id}',${cv}+1)" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-secondary);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
-        <span style="font-size:11px;color:var(--text-muted);min-width:40px">${a.unit||''}</span>
-      </div>`;
-    }
-    html += `</div>`;
-  });
-  html += `</div>`;
-  return html;
+// ============================================
+// TEST FUNCTIONS (run manually)
+// ============================================
+function testGetAll() {
+  var today = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyy-MM-dd");
+  var e = { parameter: { action: "getAll", date: today } };
+  var result = doGet(e);
+  Logger.log(result.getContent());
 }
-
-// ---- KELOLA (ADMIN) ----
-function renderKelola() {
-  let html = `
-  <!-- Kelola Anggota -->
-  <div style="margin-bottom:28px">
-    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:16px">👥 Anggota (${members.length})</p>
-    <div class="card" style="padding:16px;margin-bottom:12px">`;
-  members.forEach((m,i) => {
-    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:${i<members.length-1?'1px solid var(--border-subtle)':'none'}">
-      <div style="width:32px;height:32px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,${COLORS[i%COLORS.length]}88,${COLORS[i%COLORS.length]});display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:600">${m.name[0]}</div>
-      <div style="flex:1">
-        <div style="font-size:14px">${m.name}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔑 PIN: <span style="color:var(--accent);font-family:monospace;letter-spacing:2px">${m.pin}</span></div>
-      </div>
-      <button onclick="editMemberPin(${i})" style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(110,201,169,0.2);background:rgba(110,201,169,0.08);color:var(--green);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Ubah PIN">🔑</button>
-      <button onclick="editMember(${i})" style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(201,169,110,0.2);background:rgba(201,169,110,0.08);color:var(--accent);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center">✎</button>
-      <button onclick="removeMember(${i})" style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(201,110,110,0.2);background:rgba(201,110,110,0.08);color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:${members.length<=1?'0.3':'1'}">✕</button>
-    </div>`;
-  });
-  html += `</div>
-    <div style="display:flex;gap:8px">
-      <input id="newMemberInput" class="input-field" style="border-radius:12px" placeholder="Tambah anggota baru..." onkeydown="if(event.key==='Enter')addMember()">
-      <button class="btn-gold" onclick="addMember()" style="white-space:nowrap">+ Tambah</button>
-    </div>
-    <p style="font-size:11px;color:var(--text-muted);margin-top:8px">💡 PIN default: 000000. Klik 🔑 untuk ubah PIN anggota.</p>
-  </div>`;
-
-  // Kelola Amalan
-  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-    <p style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin:0">📋 Daftar Amalan (${amalanList.length})</p>
-    <button class="btn-accent" onclick="showAddAmalan=!showAddAmalan;render()">+ Tambah</button>
-  </div>`;
-
-  if (showAddAmalan) {
-    html += `<div class="card" style="border-color:rgba(201,169,110,0.2)">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <input id="newAmalanName" class="input-field" placeholder="Nama amalan (misal: Shalat Witir)">
-        <div style="display:flex;gap:8px">
-          <button onclick="newAmalanType='check';render()" class="btn-accent" style="flex:1;border-color:${newAmalanType==='check'?'var(--accent)':'rgba(201,169,110,0.3)'};opacity:${newAmalanType==='check'?'1':'0.5'}">✓ Centang (Ya/Tidak)</button>
-          <button onclick="newAmalanType='number';render()" class="btn-accent" style="flex:1;border-color:${newAmalanType==='number'?'var(--accent)':'rgba(201,169,110,0.3)'};opacity:${newAmalanType==='number'?'1':'0.5'}">🔢 Angka (Jumlah)</button>
-        </div>
-        ${newAmalanType==='number' ? '<input id="newAmalanUnit" class="input-field" placeholder="Satuan (misal: lembar, kali, rakaat)">' : ''}
-        <button class="btn-gold" onclick="addAmalan()">Tambah Amalan</button>
-      </div>
-    </div>`;
-  }
-
-  html += `<div class="card" style="padding:16px">`;
-  amalanList.forEach((a,i) => {
-    html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:${i<amalanList.length-1?'1px solid var(--border-subtle)':'none'}">
-      <span style="font-size:20px;width:28px;text-align:center">${a.icon}</span>
-      <div style="flex:1"><span style="font-size:14px">${a.name}</span>
-        <span style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--text-muted)">${a.type==="check"?"Ya/Tidak":"Angka ("+(a.unit||"kali")+")"}</span>
-      </div>
-      <button onclick="removeAmalan('${a.id}')" style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(201,110,110,0.2);background:rgba(201,110,110,0.08);color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
-    </div>`;
-  });
-  html += `</div>`;
-
-  // Save Pengaturan button
-  html += `<div style="margin-top:24px">
-    <button id="saveConfigBtn" class="btn-gold" onclick="saveConfig()" style="width:100%;padding:16px;font-size:15px;border-radius:14px">
-      💾 Save Pengaturan
-    </button>
-    <p style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:8px">
-      ⚠️ Setelah ubah nama/PIN/amalan, <strong style="color:var(--accent)">wajib klik Save Pengaturan</strong> supaya semua HP dapat data yang sama.
-    </p>
-  </div>`;
-
-  return html;
-}
-
-// ============ ACTIONS ============
-let newAmalanType = "check";
-let showAddAmalan = false;
-
-function addAmalan() {
-  const nameEl = document.getElementById('newAmalanName');
-  const name = nameEl ? nameEl.value.trim() : '';
-  if (!name) return;
-  const unitEl = document.getElementById('newAmalanUnit');
-  const unit = newAmalanType==="number" ? ((unitEl ? unitEl.value.trim() : '') || "kali") : "";
-  amalanList.push({id:name.toLowerCase().replace(/\s+/g,"_")+"_"+Date.now(), name, type:newAmalanType, unit, icon:newAmalanType==="check"?"✅":"🔢"});
-  showAddAmalan = false;
-  newAmalanType = "check";
-  render();
-}
-
-function removeAmalan(id) { amalanList = amalanList.filter(a=>a.id!==id); render(); }
-
-function editMember(i) {
-  const newName = prompt("Edit nama anggota:", members[i].name);
-  if (newName && newName.trim()) { members[i].name = newName.trim(); render(); }
-}
-
-function editMemberPin(i) {
-  const newPin = prompt("Set PIN 6 digit untuk " + members[i].name + ":", members[i].pin);
-  if (newPin !== null) {
-    const clean = newPin.replace(/\D/g,'').slice(0,6);
-    if (clean.length === 6) { members[i].pin = clean; render(); }
-    else { alert("PIN harus 6 angka!"); }
-  }
-}
-
-function removeMember(i) { if (members.length<=1) return; members.splice(i,1); render(); }
-
-function addMember() {
-  const input = document.getElementById('newMemberInput');
-  if (input.value.trim()) { members.push({name:input.value.trim(), pin:"000000"}); input.value=''; render(); }
-}
-
-// ============ INIT ============
-document.getElementById('dateDisplay').textContent = new Date(today).toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-
-// ============ BACK BUTTON HANDLING ============
-// Push initial state
-history.pushState({page:'login'}, '');
-
-function pushState(state) {
-  history.pushState(state, '');
-}
-
-window.addEventListener('popstate', function(e) {
-  // Always push a new state so we never actually leave
-  history.pushState({}, '');
-
-  // If not logged in, do nothing
-  if (document.getElementById('loginScreen').classList.contains('hidden') === false) return;
-
-  // Handle back navigation within the app
-  if (pinAttemptMember) {
-    // In PIN prompt → go back to member select
-    cancelPin();
-  } else if (selectedMember) {
-    // In member detail/input form → go back to member select
-    selectedMember = null;
-    render();
-  } else if (activeTab !== "rekap") {
-    // In Input/Kelola tab → go back to Rekap
-    activeTab = "rekap";
-    render();
-  }
-  // If already on Rekap, do nothing (don't leave the app)
-});
-
-// ============ PWA INSTALL ============
-let deferredPrompt = null;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  // Don't show yet - wait until after login
-});
-
-function showInstallPopup() {
-  // Don't show if already installed or dismissed this session
-  if (window.matchMedia('(display-mode: standalone)').matches) return;
-  if (sessionStorage.getItem('installDismissed')) return;
-
-  const popup = document.createElement('div');
-  popup.id = 'installPopup';
-  popup.innerHTML = `
-    <div style="position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;animation:slideUp 0.4s ease-out">
-      <div style="max-width:420px;margin:0 auto;background:rgba(19,39,68,0.98);backdrop-filter:blur(20px);border:1px solid rgba(201,169,110,0.25);border-radius:20px;padding:24px;box-shadow:0 -8px 40px rgba(0,0,0,0.5)">
-        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
-          <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#c9a96e,#e8d5b7);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">☪</div>
-          <div>
-            <h3 style="font-size:16px;font-weight:600;color:#e8d5b7;margin:0 0 4px">Install Amaliyah di HP?</h3>
-            <p style="font-size:13px;color:rgba(255,255,255,0.6);margin:0;line-height:1.5">Buka langsung dari home screen, lebih cepat & praktis.</p>
-          </div>
-        </div>
-        
-        <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06)">
-          <p style="font-size:12px;color:var(--accent);font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:1px">🔒 Tentang Keamanan</p>
-          <p style="font-size:12px;color:rgba(255,255,255,0.5);margin:0;line-height:1.7">
-            Mungkin muncul notifikasi keamanan dari HP — ini normal karena aplikasi ini berbasis web (PWA), bukan dari Play Store/App Store. 
-            <strong style="color:rgba(255,255,255,0.7)">Insya Allah aman</strong> — tidak ada data pribadi yang dikumpulkan, semua data hanya tersimpan di Google Sheets kelompok.
-          </p>
-        </div>
-
-        <div style="display:flex;gap:10px">
-          <button onclick="dismissInstall()" style="flex:1;padding:13px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:12px;color:var(--text-secondary);font-size:14px;cursor:pointer;font-family:'Outfit',sans-serif">Nanti</button>
-          <button onclick="doInstall()" style="flex:1;padding:13px;background:linear-gradient(135deg,#c9a96e,#e8d5b7);border:none;border-radius:12px;color:#0a1628;font-size:14px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif">Ya, Install!</button>
-        </div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(popup);
-}
-
-function doInstall() {
-  const popup = document.getElementById('installPopup');
-  if (popup) popup.remove();
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(choice => {
-      deferredPrompt = null;
-    });
-  }
-}
-
-function dismissInstall() {
-  const popup = document.getElementById('installPopup');
-  if (popup) popup.remove();
-  sessionStorage.setItem('installDismissed', 'true');
-}
-
-// iOS install hint (called from showApp)
-function showIOSInstallPopup() {
-  if (sessionStorage.getItem('installDismissed')) return;
-  const popup = document.createElement('div');
-  popup.id = 'installPopup';
-  popup.innerHTML = `
-    <div style="position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:16px;animation:slideUp 0.4s ease-out">
-      <div style="max-width:420px;margin:0 auto;background:rgba(19,39,68,0.98);backdrop-filter:blur(20px);border:1px solid rgba(201,169,110,0.25);border-radius:20px;padding:24px;box-shadow:0 -8px 40px rgba(0,0,0,0.5)">
-        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
-          <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#c9a96e,#e8d5b7);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">☪</div>
-          <div>
-            <h3 style="font-size:16px;font-weight:600;color:#e8d5b7;margin:0 0 4px">Install Amaliyah di HP?</h3>
-            <p style="font-size:13px;color:rgba(255,255,255,0.6);margin:0;line-height:1.5">Ketuk tombol <strong style="color:#fff">Share (↑)</strong> di Safari, lalu pilih <strong style="color:#fff">"Add to Home Screen"</strong>.</p>
-          </div>
-        </div>
-        <div style="background:rgba(255,255,255,0.04);border-radius:12px;padding:14px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06)">
-          <p style="font-size:12px;color:var(--accent);font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:1px">🔒 Tentang Keamanan</p>
-          <p style="font-size:12px;color:rgba(255,255,255,0.5);margin:0;line-height:1.7">
-            Insya Allah aman — ini aplikasi web (PWA), bukan dari App Store. Tidak ada data pribadi yang dikumpulkan.
-          </p>
-        </div>
-        <button onclick="dismissInstall()" style="width:100%;padding:13px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:12px;color:var(--text-secondary);font-size:14px;cursor:pointer;font-family:'Outfit',sans-serif">Oke, Paham</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(popup);
-}
-
-// Register service worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
-</script>
-
-<style>
-@keyframes slideUp {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-</style>
-</body>
-</html>
